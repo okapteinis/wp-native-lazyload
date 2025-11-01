@@ -83,8 +83,12 @@ class Context {
 			return true;
 		}
 
-		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-		return ! empty( $_SERVER['HTTP_X_REQUESTED_WITH'] ) && strtolower( wp_unslash( $_SERVER['HTTP_X_REQUESTED_WITH'] ) ) === 'xmlhttprequest';
+		if ( ! isset( $_SERVER['HTTP_X_REQUESTED_WITH'] ) ) {
+			return false;
+		}
+
+		$requested_with = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_REQUESTED_WITH'] ) );
+		return strtolower( $requested_with ) === 'xmlhttprequest';
 	}
 
 	/**
