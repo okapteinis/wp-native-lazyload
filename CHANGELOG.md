@@ -5,6 +5,66 @@ All notable changes to Native Lazyload will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2025-11-01
+
+### 🐛 Bugfix: ClassicPress Compatibility
+
+#### Fixed
+- **Fatal error on plugin activation in ClassicPress** (`src/Context.php:81-99`)
+  - Added `function_exists()` check for `wp_doing_ajax()` function
+  - Added fallback to `DOING_AJAX` constant for WordPress < 4.7 and ClassicPress
+  - Ensures compatibility with ClassicPress and older WordPress versions
+
+#### Changed
+- **Enhanced AJAX detection robustness** (`src/Context.php:81-99`)
+  - Now checks `wp_doing_ajax()` only if function exists (WordPress 4.7+)
+  - Falls back to `DOING_AJAX` constant (WordPress < 4.7, ClassicPress)
+  - Final fallback to HTTP header check (all versions)
+
+### 🔧 Technical Details
+
+#### Root Cause
+The `wp_doing_ajax()` function was introduced in WordPress 4.7. ClassicPress and some WordPress installations might not have this function available at plugin activation time, causing a fatal error.
+
+#### Solution
+```php
+// Before (v1.1.0):
+if ( wp_doing_ajax() ) {
+    return true;
+}
+
+// After (v1.1.1):
+if ( function_exists( 'wp_doing_ajax' ) && wp_doing_ajax() ) {
+    return true;
+}
+
+if ( defined( 'DOING_AJAX' ) && DOING_AJAX ) {
+    return true;
+}
+```
+
+#### Files Modified
+1. **native-lazyload.php**
+   - Line 14: Version updated to 1.1.1
+
+2. **src/Context.php**
+   - Lines 81-99: Enhanced `is_ajax()` method with compatibility checks
+
+3. **readme.txt**
+   - Line 7: Stable tag updated to 1.1.1
+   - Lines 67-73: Added changelog entry for v1.1.1
+
+### 📊 Statistics
+- **Files changed:** 3
+- **Lines added:** ~9
+- **Lines removed:** ~3
+- **Bug fixes:** 1 critical
+
+### 👥 Contributors
+- **Ojārs Kapteinis** - Bugfix and testing with ClassicPress
+
+---
+
 ## [1.1.0] - 2025-11-01
 
 ### PHP 8.4 Compatibility Update

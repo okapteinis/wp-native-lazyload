@@ -4,7 +4,7 @@ Contributors:      google, flixos90, okapteinis
 Requires at least: 4.7
 Tested up to:      6.7
 Requires PHP:      7.4
-Stable tag:        1.1.0
+Stable tag:        1.1.1
 License:           Apache License 2.0
 License URI:       https://www.apache.org/licenses/LICENSE-2.0
 Tags:              lazyload, lazy, load, native, loading, images, iframes
@@ -63,6 +63,14 @@ If you have some ideas to improve the plugin or to solve a bug, feel free to rai
 You can also contribute to the plugin by translating it. Simply visit [translate.wordpress.org](https://translate.wordpress.org/projects/wp-plugins/native-lazyload) to get started.
 
 == Changelog ==
+
+= 1.1.1 =
+
+* **Bugfix: ClassicPress Compatibility**
+* Fix fatal error on activation in ClassicPress
+* Add function_exists check for wp_doing_ajax()
+* Add fallback to DOING_AJAX constant for better compatibility
+* Ensure compatibility with ClassicPress and WordPress < 4.7
 
 = 1.1.0 =
 

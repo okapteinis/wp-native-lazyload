@@ -1,14 +1,73 @@
-# 📦 Native Lazyload v1.1.0 - Release Notes
+# 📦 Native Lazyload - Release Notes
 
-**Release Date:** November 1, 2025
+## v1.1.1 - Bugfix Release (2025-11-01)
+
 **Branch:** nightly
 **Status:** ✅ Production Ready
 
+### 🐛 Critical Bugfix: ClassicPress Compatibility
+
+This is a **hotfix release** addressing a fatal error on plugin activation in ClassicPress.
+
+#### What Was Fixed
+- **Fatal error on activation in ClassicPress**
+  - Added `function_exists()` check for `wp_doing_ajax()` function
+  - Added fallback to `DOING_AJAX` constant
+  - Ensures compatibility with ClassicPress and WordPress < 4.7
+
+#### Root Cause
+The `wp_doing_ajax()` function was introduced in WordPress 4.7. When the plugin tried to call this function in ClassicPress (which may not have this function), it caused a fatal error during activation.
+
+#### The Fix
+**Location:** `src/Context.php:81-99`
+
+```php
+// Before (v1.1.0) - Caused fatal error:
+if ( wp_doing_ajax() ) {
+    return true;
+}
+
+// After (v1.1.1) - Fixed:
+// Check using wp_doing_ajax() if available (WordPress 4.7+).
+if ( function_exists( 'wp_doing_ajax' ) && wp_doing_ajax() ) {
+    return true;
+}
+
+// Fallback to checking DOING_AJAX constant (WordPress < 4.7, ClassicPress).
+if ( defined( 'DOING_AJAX' ) && DOING_AJAX ) {
+    return true;
+}
+
+// Check HTTP_X_REQUESTED_WITH header as final fallback.
+if ( ! isset( $_SERVER['HTTP_X_REQUESTED_WITH'] ) ) {
+    return false;
+}
+
+$requested_with = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_REQUESTED_WITH'] ) );
+return strtolower( $requested_with ) === 'xmlhttprequest';
+```
+
+#### Compatibility Improved
+- ✅ ClassicPress (all versions)
+- ✅ WordPress 4.7+ (using `wp_doing_ajax()`)
+- ✅ WordPress < 4.7 (using `DOING_AJAX` constant)
+- ✅ All platforms (HTTP header fallback)
+
+#### Upgrade Recommendation
+**Immediate upgrade recommended** if you experienced activation issues with v1.1.0.
+
 ---
 
-## 🎯 Release Overview
+## v1.1.0 - PHP 8.4 Compatibility (2025-11-01)
+
+**Branch:** nightly
+**Status:** ⚠️ Superseded by v1.1.1
+
+### 🎯 Release Overview
 
 This release updates the Native Lazyload plugin for **PHP 8.4 compatibility** and includes minor security improvements. The plugin continues to provide native browser lazy-loading for images and iframes with JavaScript fallback support.
+
+**Note:** This version had a compatibility issue with ClassicPress. Please use v1.1.1 instead.
 
 ---
 
