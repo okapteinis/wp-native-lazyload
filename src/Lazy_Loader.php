@@ -51,6 +51,22 @@ class Lazy_Loader {
 	protected $fallback_enabled = null;
 
 	/**
+	 * Counter to track images processed in content.
+	 *
+	 * @since 1.1.0
+	 * @var int
+	 */
+	protected $content_image_count = 0;
+
+	/**
+	 * Flag to track if we're processing featured/thumbnail image.
+	 *
+	 * @since 1.1.0
+	 * @var bool
+	 */
+	protected $is_featured_image = false;
+
+	/**
 	 * Constructor.
 	 *
 	 * @since 1.0.0
@@ -77,6 +93,11 @@ class Lazy_Loader {
 			return;
 		}
 
+		// Allow disabling lazy loading for specific post types or templates.
+		if ( $this->is_lazyload_disabled() ) {
+			return;
+		}
+
 		// Prepare applicable elements to be lazy-loaded.
 		add_action( 'wp_head', [ $this, 'add_lazyload_filters' ], PHP_INT_MAX );
 
@@ -97,11 +118,12 @@ class Lazy_Loader {
 					$allowed_tags[ $tag ] = array_merge(
 						$allowed_tags[ $tag ],
 						[
-							'loading'     => [],
-							'data-src'    => [],
-							'data-srcset' => [],
-							'data-sizes'  => [],
-							'class'       => [],
+							'loading'       => [],
+							'fetchpriority' => [],
+							'data-src'      => [],
+							'data-srcset'   => [],
+							'data-sizes'    => [],
+							'class'         => [],
 						]
 					);
 				}
@@ -125,7 +147,7 @@ class Lazy_Loader {
 	 */
 	public function add_lazyload_filters() {
 		add_filter( 'the_content', [ $this, 'filter_add_lazyload_placeholders' ], PHP_INT_MAX );
-		add_filter( 'post_thumbnail_html', [ $this, 'filter_add_lazyload_placeholders' ], PHP_INT_MAX );
+		add_filter( 'post_thumbnail_html', [ $this, 'filter_add_lazyload_placeholders_featured' ], PHP_INT_MAX );
 		add_filter( 'get_avatar', [ $this, 'filter_add_lazyload_placeholders' ], PHP_INT_MAX );
 		add_filter( 'widget_text', [ $this, 'filter_add_lazyload_placeholders' ], PHP_INT_MAX );
 		add_filter( 'get_image_tag', [ $this, 'filter_add_lazyload_placeholders' ], PHP_INT_MAX );
@@ -139,11 +161,26 @@ class Lazy_Loader {
 	 */
 	public function remove_lazyload_filters() {
 		remove_filter( 'the_content', [ $this, 'filter_add_lazyload_placeholders' ], PHP_INT_MAX );
-		remove_filter( 'post_thumbnail_html', [ $this, 'filter_add_lazyload_placeholders' ], PHP_INT_MAX );
+		remove_filter( 'post_thumbnail_html', [ $this, 'filter_add_lazyload_placeholders_featured' ], PHP_INT_MAX );
 		remove_filter( 'get_avatar', [ $this, 'filter_add_lazyload_placeholders' ], PHP_INT_MAX );
 		remove_filter( 'widget_text', [ $this, 'filter_add_lazyload_placeholders' ], PHP_INT_MAX );
 		remove_filter( 'get_image_tag', [ $this, 'filter_add_lazyload_placeholders' ], PHP_INT_MAX );
 		remove_filter( 'wp_get_attachment_image_attributes', [ $this, 'filter_lazyload_attributes' ], PHP_INT_MAX );
+	}
+
+	/**
+	 * Wrapper for featured/thumbnail images to mark them appropriately.
+	 *
+	 * @since 1.1.0
+	 *
+	 * @param string $content The featured image HTML.
+	 * @return string Filtered content prepared for lazy-loading.
+	 */
+	public function filter_add_lazyload_placeholders_featured( string $content ) : string {
+		$this->is_featured_image = true;
+		$result = $this->filter_add_lazyload_placeholders( $content );
+		$this->is_featured_image = false;
+		return $result;
 	}
 
 	/**
@@ -165,6 +202,11 @@ class Lazy_Loader {
 			return $content;
 		}
 
+		// Reset image counter for the_content filter.
+		if ( current_filter() === 'the_content' ) {
+			$this->content_image_count = 0;
+		}
+
 		// Find all applicable elements via regex and add lazy-load attributes.
 		$content = preg_replace_callback(
 			'#<(' . static::LAZYLOAD_TAGS . ')([^>]+?)(>(.*?)</\\1>|[\/]?>)#si',
@@ -175,9 +217,16 @@ class Lazy_Loader {
 				}
 
 				$old_attributes = $this->parse_attributes_string( $matches[2] );
-				$new_attributes = $this->filter_lazyload_attributes( $old_attributes, strtolower( $matches[1] ) );
+				$tag = strtolower( $matches[1] );
 
-				// If we didn't add lazy-load attributes, just return the original match.
+				// Increment image counter for img tags in content.
+				if ( 'img' === $tag && current_filter() === 'the_content' ) {
+					$this->content_image_count++;
+				}
+
+				$new_attributes = $this->filter_lazyload_attributes( $old_attributes, $tag );
+
+				// If we didn't add any loading attribute, just return the original match.
 				if ( empty( $new_attributes['loading'] ) ) {
 					return $matches[0];
 				}
@@ -188,7 +237,8 @@ class Lazy_Loader {
 				$output = sprintf( '<%1$s %2$s%3$s', $matches[1], $new_attributes_str, $matches[3] );
 
 				// If JavaScript fallback attributes are present, add a <noscript> fallback.
-				if ( isset( $new_attributes['data-src'] ) ) {
+				// Only add noscript for lazy-loaded images, not eager ones.
+				if ( isset( $new_attributes['data-src'] ) && 'lazy' === $new_attributes['loading'] ) {
 					$noscript_tag = str_replace( '<' . $matches[1] . ' ', '<' . $matches[1] . ' loading="lazy" ', $matches[0] );
 
 					$output .= sprintf( '<noscript>%s</noscript>', $noscript_tag );
@@ -216,11 +266,35 @@ class Lazy_Loader {
 			return $attributes;
 		}
 
+		// Check if image should be skipped via filter.
+		$image_html = $this->build_attributes_string( $attributes );
+		$skip = apply_filters( 'wp_native_lazyload_skip_image', false, $image_html, $attributes );
+		if ( $skip ) {
+			return $attributes;
+		}
+
+		// Check for excluded classes.
 		if ( ! empty( $attributes['class'] ) && $this->has_excluded_class( $attributes['class'] ) ) {
 			return $attributes;
 		}
 
-		// Native browser lazy-loading.
+		// Determine if this image should load eagerly (LCP optimization).
+		$should_load_eager = $this->should_load_eager( $attributes, $tag );
+
+		if ( $should_load_eager ) {
+			// Set loading="eager" for LCP images.
+			$attributes['loading'] = 'eager';
+
+			// Add fetchpriority="high" for critical images that have specific classes.
+			if ( $this->should_have_high_priority( $attributes ) ) {
+				$attributes['fetchpriority'] = 'high';
+			}
+
+			// Don't apply lazy loading to eager images.
+			return $attributes;
+		}
+
+		// Native browser lazy-loading for non-LCP images.
 		$attributes['loading'] = 'lazy';
 
 		if ( $this->fallback_script_enabled() && false !== strpos( static::LAZYLOAD_FALLBACK_TAGS, $tag ) ) {
@@ -330,7 +404,186 @@ class Lazy_Loader {
 			return true;
 		}
 
+		// Check for eager-load classes (these should use loading="eager" instead).
+		$eager_classes = [ 'no-lazy', 'eager-load', 'skip-lazyload' ];
+		foreach ( $eager_classes as $eager_class ) {
+			if ( false !== strpos( $classes, $eager_class ) ) {
+				return true;
+			}
+		}
+
+		// Allow filtering of excluded classes.
+		$excluded_classes = apply_filters( 'wp_native_lazyload_excluded_classes', [] );
+		if ( ! empty( $excluded_classes ) ) {
+			foreach ( $excluded_classes as $excluded_class ) {
+				if ( false !== strpos( $classes, $excluded_class ) ) {
+					return true;
+				}
+			}
+		}
+
 		return false;
+	}
+
+	/**
+	 * Determines if an image should load eagerly for LCP optimization.
+	 *
+	 * @since 1.1.0
+	 *
+	 * @param array  $attributes Image attributes.
+	 * @param string $tag        Tag name (img or iframe).
+	 * @return bool True if image should load eagerly.
+	 */
+	protected function should_load_eager( array $attributes, string $tag = 'img' ) : bool {
+		// Only apply to img tags.
+		if ( 'img' !== $tag ) {
+			return false;
+		}
+
+		// Check if image has explicit eager-load classes.
+		if ( ! empty( $attributes['class'] ) ) {
+			$eager_classes = [ 'no-lazy', 'eager-load' ];
+			foreach ( $eager_classes as $eager_class ) {
+				if ( false !== strpos( $attributes['class'], $eager_class ) ) {
+					return true;
+				}
+			}
+
+			// Hero images and banners are often LCP candidates.
+			$lcp_classes = [ 'hero', 'banner', 'header-image', 'featured' ];
+			foreach ( $lcp_classes as $lcp_class ) {
+				if ( false !== strpos( $attributes['class'], $lcp_class ) ) {
+					return true;
+				}
+			}
+		}
+
+		// Featured/thumbnail images are often above the fold.
+		if ( $this->is_featured_image ) {
+			/**
+			 * Filters whether featured images should load eagerly.
+			 *
+			 * @since 1.1.0
+			 *
+			 * @param bool  $eager_load Whether to load featured images eagerly. Default true.
+			 * @param array $attributes Image attributes.
+			 */
+			$eager_featured = apply_filters( 'wp_native_lazyload_eager_featured_image', true, $attributes );
+			if ( $eager_featured ) {
+				return true;
+			}
+		}
+
+		// First X images in content should load eagerly.
+		if ( current_filter() === 'the_content' ) {
+			/**
+			 * Filters the number of content images to load eagerly.
+			 *
+			 * @since 1.1.0
+			 *
+			 * @param int $count Number of images to load eagerly. Default 2.
+			 */
+			$eager_count = apply_filters( 'wp_native_lazyload_eager_images_count', 2 );
+			if ( $this->content_image_count <= $eager_count ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Determines if an image should have fetchpriority="high".
+	 *
+	 * @since 1.1.0
+	 *
+	 * @param array $attributes Image attributes.
+	 * @return bool True if image should have high priority.
+	 */
+	protected function should_have_high_priority( array $attributes ) : bool {
+		// Only apply high priority to specific critical images.
+		if ( ! empty( $attributes['class'] ) ) {
+			// Hero images, banners, and first featured images get high priority.
+			$high_priority_classes = [ 'hero', 'banner', 'header-image', 'priority-high' ];
+			foreach ( $high_priority_classes as $priority_class ) {
+				if ( false !== strpos( $attributes['class'], $priority_class ) ) {
+					return true;
+				}
+			}
+		}
+
+		// First image in content gets high priority.
+		if ( current_filter() === 'the_content' && $this->content_image_count === 1 ) {
+			return true;
+		}
+
+		// Featured images can get high priority.
+		if ( $this->is_featured_image ) {
+			/**
+			 * Filters whether featured images should have high fetch priority.
+			 *
+			 * @since 1.1.0
+			 *
+			 * @param bool  $high_priority Whether featured images get high priority. Default true.
+			 * @param array $attributes    Image attributes.
+			 */
+			return apply_filters( 'wp_native_lazyload_featured_image_high_priority', true, $attributes );
+		}
+
+		return false;
+	}
+
+	/**
+	 * Checks if lazy loading should be disabled for the current context.
+	 *
+	 * @since 1.1.0
+	 *
+	 * @return bool True if lazy loading should be disabled.
+	 */
+	protected function is_lazyload_disabled() : bool {
+		// Check if we're on a singular post.
+		if ( is_singular() ) {
+			$post_type = get_post_type();
+
+			/**
+			 * Filters post types where lazy loading should be disabled.
+			 *
+			 * @since 1.1.0
+			 *
+			 * @param array $post_types Array of post type slugs to disable lazy loading.
+			 */
+			$disabled_post_types = apply_filters( 'wp_native_lazyload_disabled_post_types', [] );
+			if ( in_array( $post_type, $disabled_post_types, true ) ) {
+				return true;
+			}
+
+			// Check for specific page templates.
+			if ( is_page() ) {
+				$template = get_page_template_slug();
+				if ( $template ) {
+					/**
+					 * Filters page templates where lazy loading should be disabled.
+					 *
+					 * @since 1.1.0
+					 *
+					 * @param array $templates Array of template file names to disable lazy loading.
+					 */
+					$disabled_templates = apply_filters( 'wp_native_lazyload_disabled_templates', [] );
+					if ( in_array( $template, $disabled_templates, true ) ) {
+						return true;
+					}
+				}
+			}
+		}
+
+		/**
+		 * Filters whether lazy loading should be disabled for the current request.
+		 *
+		 * @since 1.1.0
+		 *
+		 * @param bool $disabled Whether lazy loading should be disabled.
+		 */
+		return apply_filters( 'wp_native_lazyload_disabled', false );
 	}
 
 	/**
