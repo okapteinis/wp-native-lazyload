@@ -79,12 +79,23 @@ class Context {
 	 * @return bool True if an AJAX request, false otherwise.
 	 */
 	public function is_ajax() : bool {
-		if ( wp_doing_ajax() ) {
+		// Check using wp_doing_ajax() if available (WordPress 4.7+).
+		if ( function_exists( 'wp_doing_ajax' ) && wp_doing_ajax() ) {
 			return true;
 		}
 
-		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-		return ! empty( $_SERVER['HTTP_X_REQUESTED_WITH'] ) && strtolower( wp_unslash( $_SERVER['HTTP_X_REQUESTED_WITH'] ) ) === 'xmlhttprequest';
+		// Fallback to checking DOING_AJAX constant (WordPress < 4.7, ClassicPress).
+		if ( defined( 'DOING_AJAX' ) && DOING_AJAX ) {
+			return true;
+		}
+
+		// Check HTTP_X_REQUESTED_WITH header as final fallback.
+		if ( ! isset( $_SERVER['HTTP_X_REQUESTED_WITH'] ) ) {
+			return false;
+		}
+
+		$requested_with = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_REQUESTED_WITH'] ) );
+		return strtolower( $requested_with ) === 'xmlhttprequest';
 	}
 
 	/**

@@ -11,7 +11,7 @@
  * Plugin Name: Native Lazyload
  * Plugin URI:  https://wordpress.org/plugins/native-lazyload/
  * Description: Lazy-loads media using the native browser feature.
- * Version:     1.0.2
+ * Version:     1.1.1
  * Author:      Google
  * Author URI:  https://opensource.google.com
  * License:     Apache License 2.0
@@ -27,7 +27,7 @@
  * @since 1.0.0
  */
 function native_lazyload_load() {
-	if ( version_compare( phpversion(), '7.0', '<' ) ) {
+	if ( version_compare( phpversion(), '7.4', '<' ) ) {
 		add_action( 'admin_notices', 'native_lazyload_display_php_version_notice' );
 		return;
 	}
@@ -63,8 +63,8 @@ function native_lazyload_display_php_version_notice() {
 			printf(
 				/* translators: 1: required version, 2: currently used version */
 				esc_html__( 'Native Lazyload requires at least PHP version %1$s. Your site is currently running on PHP %2$s.', 'native-lazyload' ),
-				'7.0',
-				phpversion() // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped 
+				'7.4',
+				phpversion() // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 			);
 			?>
 		</p>
