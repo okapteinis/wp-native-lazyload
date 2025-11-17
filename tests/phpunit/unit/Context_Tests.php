@@ -23,7 +23,7 @@ class Context_Tests extends Unit_Test_Case {
 
 	private $context;
 
-	public function setUp() {
+	public function setUp(): void {
 		parent::setUp();
 		$this->context = new Context( static::TEST_MAIN_FILE );
 	}

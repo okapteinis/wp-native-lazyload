@@ -1,0 +1,14 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 6
+    paths:
+        - native-lazyload.php
+        - src/
+    bootstrapFiles:
+        - tests/phpunit/bootstrap.php
+    ignoreErrors:
+        # Allow WordPress functions that may not be defined during static analysis
+        - '#Function (add_action|add_filter|remove_filter|apply_filters|is_feed|is_preview|is_amp_endpoint|wp_doing_ajax|get_bloginfo|plugin_dir_path|plugin_dir_url|plugin_basename|wp_kses_hair|wp_allowed_protocols|esc_attr|esc_url|esc_html__|wp_json_encode|wp_register_script|wp_script_add_data|wp_unslash|function_exists) not found\.#'
+    phpVersion: 80400

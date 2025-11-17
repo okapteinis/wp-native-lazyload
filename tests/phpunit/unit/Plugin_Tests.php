@@ -21,7 +21,7 @@ class Plugin_Tests extends Unit_Test_Case {
 
 	private $plugin;
 
-	public function setUp() {
+	public function setUp(): void {
 		parent::setUp();
 		$this->plugin = new Plugin( dirname( dirname( dirname( __DIR__ ) ) ) . '/native-lazyload.php' );
 	}
