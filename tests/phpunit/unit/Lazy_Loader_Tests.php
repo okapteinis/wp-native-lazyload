@@ -24,7 +24,7 @@ class Lazy_Loader_Tests extends Unit_Test_Case {
 	private $context;
 	private $lazy_loader;
 
-	public function setUp() {
+	public function setUp(): void {
 		parent::setUp();
 
 		$this->context = $this->getMockBuilder( Context::class )

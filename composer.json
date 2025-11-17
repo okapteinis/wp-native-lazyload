@@ -35,19 +35,27 @@
   },
   "require": {
     "php": ">=7.0",
-    "composer/installers": "^1"
+    "composer/installers": "^1 || ^2"
   },
   "require-dev": {
     "squizlabs/php_codesniffer": "^3.3",
-    "dealerdirect/phpcodesniffer-composer-installer": "^0.4",
-    "wp-coding-standards/wpcs": "^2",
-    "phpunit/phpunit": "^6",
-    "brain/monkey": "^2"
+    "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+    "wp-coding-standards/wpcs": "^3.0",
+    "phpunit/phpunit": "^9.0",
+    "brain/monkey": "^2",
+    "phpstan/phpstan": "^1.10",
+    "szepeviktor/phpstan-wordpress": "^1.3"
   },
   "scripts": {
     "phplint": "find -L .  -path ./vendor -prune -o -name '*.php' -print0 | xargs -0 -n 1 -P 4 php -l",
     "phpcs": "@php ./vendor/bin/phpcs",
     "phpunit": "@php ./vendor/bin/phpunit",
     "phpunit-cov": "@php ./vendor/bin/phpunit --coverage-clover tests/logs/clover.xml"
+  },
+  "config": {
+    "allow-plugins": {
+      "composer/installers": true,
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    }
   }
 }
