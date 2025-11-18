@@ -17,16 +17,13 @@ When working on this WordPress plugin, follow these guidelines:
 - Verify compatibility with WordPress 6.7
 - Verify compatibility with ClassicPress
 - Check that no deprecated WordPress functions are used
-- Ensure proper use of WordPress sanitization functions like `sanitize_text_field()`
-- Verify nonce usage for security
-- Check output escaping to prevent XSS
 
 ## Security Checks
 
-- Verify all user inputs are properly sanitized
-- Check for proper output escaping
+- Verify all user inputs are properly sanitized using `sanitize_text_field()` and similar functions
+- Check for proper output escaping to prevent XSS
 - Ensure no SQL injection vulnerabilities
-- Verify CSRF protection where applicable
+- Verify nonce usage for CSRF protection
 - Run security scans if available
 
 ## Testing
@@ -44,6 +41,13 @@ When working on this WordPress plugin, follow these guidelines:
 
 - Always preserve the original license: Apache License 2.0
 
-- Use clear commit message format with type and summary line
+- Use clear commit message format with type and summary line, for example:
+  ```
+  feat: Add new feature for X
+  fix: Resolve issue with Y
+  docs: Update documentation for Z
+  ```
 
 - Push all changes to the nightly branch only after tests pass
+  - Note: The `nightly` branch is used for AI-assisted development workflows
+  - For general contributions, refer to CONTRIBUTING.md which specifies the `main` branch
